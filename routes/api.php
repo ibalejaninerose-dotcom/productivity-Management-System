@@ -1,19 +1,11 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\GatewayLossController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
-
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
+Route::get('/gateway-loss', [GatewayLossController::class, 'index']);
+Route::post('/gateway-loss', [GatewayLossController::class, 'store']);
+Route::get('/gateway-loss/{id}', [GatewayLossController::class, 'show']);
+Route::put('/gateway-loss/{id}', [GatewayLossController::class, 'update']);
+Route::delete('/gateway-loss/{id}', [GatewayLossController::class, 'destroy']);
+Route::get('/gateway-loss-statistics', [GatewayLossController::class, 'statistics']);

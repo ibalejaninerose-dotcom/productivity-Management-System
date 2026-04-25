@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productivity Management System - Gateway Loss Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        .table {
+            min-width: 800px;
+        }
+        .btn-sm {
+            margin: 2px;
+        }
+        .sidebar {
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 250px;
+            background: #2c3e50;
+            color: white;
+            padding-top: 20px;
+            z-index: 100;
+        }
+        .sidebar a {
+            color: white;
+            padding: 10px 20px;
+            display: block;
+            text-decoration: none;
+        }
+        .sidebar a:hover {
+            background: #34495e;
+        }
+        .sidebar a.active {
+            background: #3498db;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h4 class="text-center mb-4">📊 PMS</h4>
+        <a href="index.html" class="active">📋 Gateway Loss</a>
+        <a href="dashboard.html">📈 Dashboard</a>
+        <a href="settings.html">⚙️ Settings</a>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <h1 class="mb-4">📊 Gateway Loss Monitoring</h1>
+        
+        <!-- Filter and Add Button -->
+        <div class="row mb-3 align-items-center">
+            <div class="col-md-4">
+                <label>Filter by Provider:</label>
+                <select id="providerFilter" class="form-select" onchange="loadData()">
+                    <option value="">All Providers</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recordModal" onclick="clearForm()">+ Add Record</button>
+            </div>
+            <div class="col-md-3">
+                <span id="filterCount" class="text-muted mt-4 d-block"></span>
+            </div>
+        </div>
+        
+        <!-- Loading -->
+        <div id="loading" class="text-center py-5">
+            <div class="loading-spinner"></div>
+            <p class="mt-2">Loading data...</p>
+        </div>
+        
+        <!-- Error Alert -->
+        <div id="errorAlert" class="alert alert-danger d-none">
+            Failed to load data. Please check if the server is running.
+        </div>
+        
+        <!-- Table Container -->
+        <div id="tableContainer" style="display:none">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Provider</th>
+                            <th>Method</th>
+                            <th>Response Status</th>
+                            <th>Content Payload</th>
+                            <th>Message</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <div id="emptyMessage" class="text-center text-muted py-4 d-none">
+                No records found. Click "Add New Record" to create one.
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal fade" id="recordModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Add Record</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="recordId">
+                    <div class="mb-3">
+                        <label class="form-label">Provider *</label>
+                        <input id="provider" class="form-control" placeholder="e.g., GCash, PayPal, Stripe">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Method</label>
+                        <select id="method" class="form-select">
+                            <option>GET</option>
+                            <option>POST</option>
+                            <option>PUT</option>
+                            <option>DELETE</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Response Status</label>
+                        <input id="status" type="number" class="form-control" placeholder="200, 404, 500...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Content Payload (JSON)</label>
+                        <textarea id="payload" class="form-control" rows="3" placeholder='{"transaction_id": "123", "amount": 500}'></textarea>
+                        <small class="text-muted">Enter valid JSON format</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Execution Message</label>
+                        <textarea id="message" class="form-control" rows="2" placeholder="Payment processed successfully..."></textarea>
+                    </div>
+                    <div id="formError" class="alert alert-danger d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveRecord()" id="saveBtn">Save Record</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Details Modal -->
+    <div class="modal fade" id="viewModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Record Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="viewContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999">
+        <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body" id="toastMessage"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_URL = '/api/gateway-loss';
+        let providersSet = new Set();
+        
+        async function loadData() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('tableContainer').style.display = 'none';
+            document.getElementById('errorAlert').classList.add('d-none');
+            
+            try {
+                const provider = document.getElementById('providerFilter').value;
+                const url = provider ? `${API_URL}?provider=${provider}` : API_URL;
+                const response = await fetch(url);
+                
+                if (!response.ok) throw new Error('API request failed');
+                
+                const json = await response.json();
+                const records = json.data?.data || [];
+                
+                records.forEach(record => {
+                    if (record.provider) providersSet.add(record.provider);
+                });
+                updateProviderFilter();
+                
+                const tbody = document.getElementById('tableBody');
+                if (records.length === 0) {
+                    document.getElementById('emptyMessage').classList.remove('d-none');
+                    tbody.innerHTML = '';
+                } else {
+                    document.getElementById('emptyMessage').classList.add('d-none');
+                    tbody.innerHTML = records.map(record => `
+                        <tr>
+                            <td>${record.id}</td>
+                            <td><span class="badge bg-info">${escapeHtml(record.provider)}</span></td>
+                            <td><span class="badge bg-secondary">${escapeHtml(record.method)}</span></td>
+                            <td>${getStatusBadge(record.response_status)}</td>
+                            <td><small>${escapeHtml(JSON.stringify(record.content_payload).substring(0, 50))}${JSON.stringify(record.content_payload).length > 50 ? '...' : ''}</small></td>
+                            <td><small>${escapeHtml(record.exec_corusage?.substring(0, 50) || '')}</small></td>
+                            <td><small>${new Date(record.created_at).toLocaleDateString()}</small></td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="viewRecord(${record.id})">View</button>
+                                <button class="btn btn-sm btn-warning" onclick="editRecord(${record.id})">Edit</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteRecord(${record.id})">Delete</button>
+                             </td>
+                        </tr>
+                    `).join('');
+                }
+                
+                document.getElementById('tableContainer').style.display = 'block';
+                updateFilterCount(records.length);
+                
+            } catch (error) {
+                document.getElementById('errorAlert').classList.remove('d-none');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        function getStatusBadge(status) {
+            if (!status) return '<span class="badge bg-secondary">N/A</span>';
+            if (status >= 200 && status < 300) return `<span class="badge bg-success">${status} ✓</span>`;
+            if (status >= 400 && status < 500) return `<span class="badge bg-warning">${status} ⚠</span>`;
+            if (status >= 500) return `<span class="badge bg-danger">${status} ✗</span>`;
+            return `<span class="badge bg-secondary">${status}</span>`;
+        }
+        
+        function updateProviderFilter() {
+            const filter = document.getElementById('providerFilter');
+            const currentValue = filter.value;
+            const providers = Array.from(providersSet).sort();
+            filter.innerHTML = '<option value="">All Providers</option>' + 
+                providers.map(p => `<option value="${p}">${p}</option>`).join('');
+            if (currentValue) filter.value = currentValue;
+        }
+        
+        function updateFilterCount(count) {
+            document.getElementById('filterCount').textContent = `Showing ${count} records`;
+        }
+        
+        async function saveRecord() {
+            const id = document.getElementById('recordId').value;
+            let payloadRaw = document.getElementById('payload').value;
+            let payload = {};
+            try {
+                payload = payloadRaw ? JSON.parse(payloadRaw) : {};
+            } catch(e) {
+                showFormError('Invalid JSON format in Content Payload');
+                return;
+            }
+            
+            const data = {
+                provider: document.getElementById('provider').value,
+                method: document.getElementById('method').value,
+                response_status: parseInt(document.getElementById('status').value) || null,
+                content_payload: payload,
+                exec_corusage: document.getElementById('message').value
+            };
+            
+            if (!data.provider) {
+                showFormError('Provider is required');
+                return;
+            }
+            
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = 'Saving...';
+            
+            try {
+                const response = await fetch(id ? `${API_URL}/${id}` : API_URL, {
+                    method: id ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('recordModal'));
+                    modal.hide();
+                    loadData();
+                    showToast(id ? 'Record updated successfully!' : 'Record added successfully!', 'success');
+                } else {
+                    showToast('Error saving record', 'danger');
+                }
+            } catch (error) {
+                showToast('Network error. Please check if server is running.', 'danger');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = 'Save Record';
+            }
+        }
+        
+        async function editRecord(id) {
+            try {
+                const response = await fetch(`${API_URL}/${id}`);
+                const json = await response.json();
+                const record = json.data;
+                
+                document.getElementById('recordId').value = record.id;
+                document.getElementById('provider').value = record.provider;
+                document.getElementById('method').value = record.method;
+                document.getElementById('status').value = record.response_status;
+                document.getElementById('payload').value = JSON.stringify(record.content_payload, null, 2);
+                document.getElementById('message').value = record.exec_corusage || '';
+                document.getElementById('modalTitle').innerText = 'Edit Record';
+                
+                const modal = new bootstrap.Modal(document.getElementById('recordModal'));
+                modal.show();
+            } catch (error) {
+                showToast('Error loading record', 'danger');
+            }
+        }
+        
+        async function viewRecord(id) {
+            try {
+                const response = await fetch(`${API_URL}/${id}`);
+                const json = await response.json();
+                const record = json.data;
+                
+                const content = `
+                    <p><strong>ID:</strong> ${record.id}</p>
+                    <p><strong>Provider:</strong> ${record.provider}</p>
+                    <p><strong>Method:</strong> ${record.method}</p>
+                    <p><strong>Response Status:</strong> ${getStatusBadge(record.response_status)}</p>
+                    <p><strong>Content Payload:</strong></p>
+                    <pre class="bg-light p-2 rounded">${JSON.stringify(record.content_payload, null, 2)}</pre>
+                    <p><strong>Execution Message:</strong></p>
+                    <p class="bg-light p-2 rounded">${escapeHtml(record.exec_corusage) || 'N/A'}</p>
+                    <p><strong>Created At:</strong> ${new Date(record.created_at).toLocaleString()}</p>
+                    <p><strong>Updated At:</strong> ${new Date(record.updated_at).toLocaleString()}</p>
+                `;
+                
+                document.getElementById('viewContent').innerHTML = content;
+                const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+                modal.show();
+            } catch (error) {
+                showToast('Error loading record details', 'danger');
+            }
+        }
+        
+        async function deleteRecord(id) {
+            if (confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
+                try {
+                    const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        loadData();
+                        showToast('Record deleted successfully!', 'success');
+                    } else {
+                        showToast('Error deleting record', 'danger');
+                    }
+                } catch (error) {
+                    showToast('Network error', 'danger');
+                }
+            }
+        }
+        
+        function clearForm() {
+            document.getElementById('recordId').value = '';
+            document.getElementById('provider').value = '';
+            document.getElementById('method').value = 'GET';
+            document.getElementById('status').value = '';
+            document.getElementById('payload').value = '';
+            document.getElementById('message').value = '';
+            document.getElementById('modalTitle').innerText = 'Add Record';
+            document.getElementById('formError').classList.add('d-none');
+        }
+        
+        function showFormError(message) {
+            const errorDiv = document.getElementById('formError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('d-none');
+            setTimeout(() => errorDiv.classList.add('d-none'), 3000);
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('liveToast');
+            toast.className = `toast align-items-center text-white bg-${type} border-0`;
+            document.getElementById('toastMessage').textContent = message;
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        loadData();
+    </script>
+</body>
+</html>
