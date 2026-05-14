@@ -2,160 +2,143 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GatewayLoss;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class GatewayLossController extends Controller
 {
-    // GET /api/gateway-loss
+    // GET all records
     public function index()
     {
-        $records = DB::table('gateway_loss')->get();
-        
+        $records = GatewayLoss::all();
         return response()->json([
             'success' => true,
-            'data' => [
-                'data' => $records
-            ],
-            'message' => 'Gateway losses retrieved successfully'
-        ]);
+            'data' => $records,
+            'message' => 'Records retrieved successfully'
+        ], 200);
     }
 
-    // POST /api/gateway-loss
-    public function store(Request $request)
+    // GET single record
+    public function show($id)
     {
-        $id = DB::table('gateway_loss')->insertGetId([
-            'provider' => $request->provider,
-            'method' => $request->method ?? 'GET',
-            'response_status' => $request->response_status,
-            'content_payload' => json_encode($request->content_payload),
-            'exec_corusage' => $request->exec_corusage,
-            'created_at' => now(),
-            'updated_at' => now()
-        ]);
+        $record = GatewayLoss::find($id);
         
-        $record = DB::table('gateway_loss')->where('id', $id)->first();
+        if (!$record) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Record not found'
+            ], 404);
+        }
         
         return response()->json([
             'success' => true,
             'data' => $record,
-            'message' => 'Gateway loss created successfully'
+            'message' => 'Record retrieved successfully'
+        ], 200);
+    }
+
+    // POST create record
+    public function store(Request $request)
+    {
+        $request->validate([
+            'provider' => 'required|string',
+            'loss_amount' => 'required|numeric',
+            'date' => 'required|date'
+        ]);
+
+        $record = GatewayLoss::create([
+            'provider' => $request->provider,
+            'loss_amount' => $request->loss_amount,
+            'date' => $request->date,
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'data' => $record,
+            'message' => 'Record created successfully'
         ], 201);
     }
 
-    // GET /api/gateway-loss/{id}
-    public function show($id)
+    // PUT update record (full update)
+    public function update(Request $request, $id)
     {
-        $record = DB::table('gateway_loss')->where('id', $id)->first();
+        $record = GatewayLoss::find($id);
         
         if (!$record) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gateway loss not found'
+                'message' => 'Record not found'
             ], 404);
         }
+
+        $request->validate([
+            'provider' => 'required|string',
+            'loss_amount' => 'required|numeric',
+            'date' => 'required|date'
+        ]);
+        
+        $record->update([
+            'provider' => $request->provider,
+            'loss_amount' => $request->loss_amount,
+            'date' => $request->date,
+        ]);
         
         return response()->json([
             'success' => true,
             'data' => $record,
-            'message' => 'Gateway loss retrieved successfully'
-        ]);
+            'message' => 'Record updated successfully'
+        ], 200);
     }
 
-    // PUT /api/gateway-loss/{id}
-    public function update(Request $request, $id)
+    // PATCH update record (partial update)
+    public function partialUpdate(Request $request, $id)
     {
-        $record = DB::table('gateway_loss')->where('id', $id)->first();
+        $record = GatewayLoss::find($id);
         
         if (!$record) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gateway loss not found'
+                'message' => 'Record not found'
             ], 404);
         }
+
+        // I-update lang ang mga fields nga naa sa request
+        if ($request->has('provider')) {
+            $record->provider = $request->provider;
+        }
+        if ($request->has('loss_amount')) {
+            $record->loss_amount = $request->loss_amount;
+        }
+        if ($request->has('date')) {
+            $record->date = $request->date;
+        }
         
-        DB::table('gateway_loss')->where('id', $id)->update([
-            'provider' => $request->provider ?? $record->provider,
-            'method' => $request->method ?? $record->method,
-            'response_status' => $request->response_status ?? $record->response_status,
-            'content_payload' => $request->content_payload ? json_encode($request->content_payload) : $record->content_payload,
-            'exec_corusage' => $request->exec_corusage ?? $record->exec_corusage,
-            'updated_at' => now()
-        ]);
-        
-        $updated = DB::table('gateway_loss')->where('id', $id)->first();
+        $record->save();
         
         return response()->json([
             'success' => true,
-            'data' => $updated,
-            'message' => 'Gateway loss updated successfully'
-        ]);
+            'data' => $record,
+            'message' => 'Record partially updated successfully'
+        ], 200);
     }
 
-    // DELETE /api/gateway-loss/{id}
+    // DELETE record
     public function destroy($id)
     {
-        $record = DB::table('gateway_loss')->where('id', $id)->first();
+        $record = GatewayLoss::find($id);
         
         if (!$record) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gateway loss not found'
+                'message' => 'Record not found'
             ], 404);
         }
         
-        DB::table('gateway_loss')->where('id', $id)->delete();
+        $record->delete();
         
         return response()->json([
             'success' => true,
-            'message' => 'Gateway loss deleted successfully'
-        ]);
-    }
-
-    // GET /api/gateway-loss-statistics
-    public function statistics()
-    {
-        $total = DB::table('gateway_loss')->count();
-        
-        $byProvider = DB::table('gateway_loss')
-            ->select('provider', DB::raw('count(*) as total'))
-            ->groupBy('provider')
-            ->get();
-        
-        // Status distribution: Success (2xx) vs Failed (4xx,5xx)
-        $success = DB::table('gateway_loss')
-            ->whereBetween('response_status', [200, 299])
-            ->count();
-        
-        $clientError = DB::table('gateway_loss')
-            ->whereBetween('response_status', [400, 499])
-            ->count();
-            
-        $serverError = DB::table('gateway_loss')
-            ->whereBetween('response_status', [500, 599])
-            ->count();
-        
-        // Daily trend (last 7 days)
-        $dailyTrend = DB::table('gateway_loss')
-            ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as total'))
-            ->where('created_at', '>=', now()->subDays(7))
-            ->groupBy(DB::raw('DATE(created_at)'))
-            ->orderBy('date', 'asc')
-            ->get();
-        
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'total' => $total,
-                'by_provider' => $byProvider,
-                'status_distribution' => [
-                    'success' => $success,
-                    'client_error' => $clientError,
-                    'server_error' => $serverError
-                ],
-                'daily_trend' => $dailyTrend
-            ],
-            'message' => 'Statistics retrieved successfully'
-        ]);
+            'message' => 'Record deleted successfully'
+        ], 200);
     }
 }

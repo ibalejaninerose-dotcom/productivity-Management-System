@@ -2,17 +2,14 @@
 
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
-
 Route::get('/', function () {
     return view('welcome');
+});
+
+// Route to get env config for frontend
+Route::get('/api-config', function() {
+    return response()->json([
+        'api_url' => env('API_URL', 'http://127.0.0.1:8000/api'),
+        'app_url' => env('APP_URL', 'http://127.0.0.1:8000'),
+    ]);
 });
